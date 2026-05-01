@@ -3,7 +3,9 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
+import swaggerUi from 'swagger-ui-express';
 import { router } from './routes';
+import { openApiSpec } from './docs/openapi';
 
 const app = express();
 const PORT = process.env.PORT ?? 3001;
@@ -16,6 +18,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
 
 // ── Routes ────────────────────────────────────────────────────────────────────
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(openApiSpec));
 app.use('/api', router);
 
 // ── 404 Handler ───────────────────────────────────────────────────────────────
