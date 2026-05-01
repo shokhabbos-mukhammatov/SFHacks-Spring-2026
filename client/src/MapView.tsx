@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import mapboxgl from 'mapbox-gl'
 import 'mapbox-gl/dist/mapbox-gl.css'
-import { events } from './events'
+import type { EventItem } from './events'
 
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN as string | undefined
 
@@ -12,11 +12,23 @@ if (MAPBOX_TOKEN) {
 export default function MapView() {
   const mapContainerRef = useRef<HTMLDivElement | null>(null)
   const mapRef = useRef<mapboxgl.Map | null>(null)
+  const markersRef = useRef<mapboxgl.Marker[]>([])
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null)
+  const [popupEvent, setPopupEvent] = useState<EventItem | null>(null)
+  const [events, setEvents] = useState<EventItem[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    fetch('/api/events')
+      .then((r) => r.json())
+      .then((data) => { if (Array.isArray(data.events)) setEvents(data.events) })
+      .catch(console.error)
+      .finally(() => setLoading(false))
+  }, [])
 
   const selectedEvent = useMemo(
     () => events.find((e) => e.id === selectedEventId) ?? events[0],
-    [selectedEventId]
+    [selectedEventId, events]
   )
 
   const flyToEvent = useCallback((lng: number, lat: number) => {
@@ -27,6 +39,7 @@ export default function MapView() {
     })
   }, [])
 
+  // Map initialisation — runs once
   useEffect(() => {
     if (!mapContainerRef.current || mapRef.current) return
 
@@ -41,24 +54,10 @@ export default function MapView() {
 
     map.on('load', () => {
       const layers = map.getStyle()?.layers ?? []
-
       layers.forEach((layer) => {
         if (layer.id.toLowerCase().includes('poi') && map.getLayer(layer.id)) {
           map.setLayoutProperty(layer.id, 'visibility', 'none')
         }
-      })
-
-      events.forEach((event) => {
-        const el = document.createElement('div')
-        el.className = 'event-marker'
-        el.setAttribute('aria-label', event.title)
-
-        new mapboxgl.Marker(el).setLngLat([event.lng, event.lat]).addTo(map)
-
-        el.addEventListener('click', () => {
-          setSelectedEventId(event.id)
-          flyToEvent(event.lng, event.lat)
-        })
       })
     })
 
@@ -69,6 +68,39 @@ export default function MapView() {
       mapRef.current = null
     }
   }, [flyToEvent])
+
+  // Add markers whenever events load
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || events.length === 0) return
+
+    markersRef.current.forEach((m) => m.remove())
+    markersRef.current = []
+
+    const addMarkers = () => {
+      events.forEach((event) => {
+        const el = document.createElement('div')
+        el.className = 'event-marker'
+        el.setAttribute('aria-label', event.title)
+
+        const marker = new mapboxgl.Marker(el).setLngLat([event.lng, event.lat]).addTo(map)
+
+        el.addEventListener('click', () => {
+          setSelectedEventId(event.id)
+          setPopupEvent(event)
+          flyToEvent(event.lng, event.lat)
+        })
+
+        markersRef.current.push(marker)
+      })
+    }
+
+    if (map.isStyleLoaded()) {
+      addMarkers()
+    } else {
+      map.once('load', addMarkers)
+    }
+  }, [events, flyToEvent])
 
   if (!MAPBOX_TOKEN) {
     return (
@@ -88,7 +120,9 @@ export default function MapView() {
       <div className="bottom-sheet">
         <div className="sheet-header">
           <div className="sheet-title">Tonight nearby</div>
-          <div className="sheet-subtitle">Public events for students</div>
+          <div className="sheet-subtitle">
+            {loading ? 'Loading events…' : `${events.length} public events`}
+          </div>
         </div>
 
         <div className="event-list">
@@ -98,6 +132,7 @@ export default function MapView() {
               className={`event-card ${selectedEvent?.id === event.id ? 'active' : ''}`}
               onClick={() => {
                 setSelectedEventId(event.id)
+                setPopupEvent(event)
                 flyToEvent(event.lng, event.lat)
               }}
             >
@@ -110,6 +145,29 @@ export default function MapView() {
           ))}
         </div>
       </div>
+
+      {popupEvent && (
+        <div className="event-popup-backdrop" onClick={() => setPopupEvent(null)}>
+          <div className="event-popup" onClick={(e) => e.stopPropagation()}>
+            <button className="event-popup-close" onClick={() => setPopupEvent(null)}>✕</button>
+            <div className="event-popup-tag">{popupEvent.category}</div>
+            <div className="event-popup-title">{popupEvent.title}</div>
+            <div className="event-popup-row">📍 {popupEvent.venue}</div>
+            <div className="event-popup-row">🕐 {popupEvent.startsAt}</div>
+            {popupEvent.description && (
+              <div className="event-popup-desc">{popupEvent.description}</div>
+            )}
+            <a
+              className="event-popup-btn"
+              href={popupEvent.url ?? `https://www.ticketmaster.com/search?q=${encodeURIComponent(popupEvent.title)}`}
+              target="_blank"
+              rel="noreferrer"
+            >
+              Register for this event →
+            </a>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
