@@ -1,4 +1,14 @@
-export const events = [
+export type EventItem = {
+  id: string
+  title: string
+  venue: string
+  startsAt: string
+  lat: number
+  lng: number
+  category: string
+}
+
+export const events: EventItem[] = [
   {
     id: '1',
     title: 'AI Hack Night',

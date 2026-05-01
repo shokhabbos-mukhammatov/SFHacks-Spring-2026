@@ -1,18 +1,12 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import mapboxgl from 'mapbox-gl'
 import 'mapbox-gl/dist/mapbox-gl.css'
 import { events } from './events'
 
-mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN || ''
+const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN as string | undefined
 
-type EventItem = {
-  id: string
-  title: string
-  venue: string
-  startsAt: string
-  lat: number
-  lng: number
-  category: string
+if (MAPBOX_TOKEN) {
+  mapboxgl.accessToken = MAPBOX_TOKEN
 }
 
 export default function MapView() {
@@ -24,6 +18,14 @@ export default function MapView() {
     () => events.find((e) => e.id === selectedEventId) ?? events[0],
     [selectedEventId]
   )
+
+  const flyToEvent = useCallback((lng: number, lat: number) => {
+    mapRef.current?.flyTo({
+      center: [lng, lat],
+      zoom: 13.5,
+      essential: true,
+    })
+  }, [])
 
   useEffect(() => {
     if (!mapContainerRef.current || mapRef.current) return
@@ -38,35 +40,24 @@ export default function MapView() {
     map.addControl(new mapboxgl.NavigationControl(), 'top-right')
 
     map.on('load', () => {
-      const style = map.getStyle()
-      const layers = style.layers || []
+      const layers = map.getStyle()?.layers ?? []
 
       layers.forEach((layer) => {
-        const id = layer.id.toLowerCase()
-
-        // hide poi clutter
-        if (id.includes('poi')) {
-          if (map.getLayer(layer.id)) {
-            map.setLayoutProperty(layer.id, 'visibility', 'none')
-          }
+        if (layer.id.toLowerCase().includes('poi') && map.getLayer(layer.id)) {
+          map.setLayoutProperty(layer.id, 'visibility', 'none')
         }
       })
 
       events.forEach((event) => {
         const el = document.createElement('div')
         el.className = 'event-marker'
+        el.setAttribute('aria-label', event.title)
 
-        new mapboxgl.Marker(el)
-          .setLngLat([event.lng, event.lat])
-          .addTo(map)
+        new mapboxgl.Marker(el).setLngLat([event.lng, event.lat]).addTo(map)
 
         el.addEventListener('click', () => {
           setSelectedEventId(event.id)
-          map.flyTo({
-            center: [event.lng, event.lat],
-            zoom: 13.5,
-            essential: true,
-          })
+          flyToEvent(event.lng, event.lat)
         })
       })
     })
@@ -77,7 +68,18 @@ export default function MapView() {
       map.remove()
       mapRef.current = null
     }
-  }, [])
+  }, [flyToEvent])
+
+  if (!MAPBOX_TOKEN) {
+    return (
+      <div className="page token-error">
+        <p>
+          Mapbox token is missing. Set <code>VITE_MAPBOX_TOKEN</code> in your{' '}
+          <code>.env</code> file.
+        </p>
+      </div>
+    )
+  }
 
   return (
     <div className="page">
@@ -96,11 +98,7 @@ export default function MapView() {
               className={`event-card ${selectedEvent?.id === event.id ? 'active' : ''}`}
               onClick={() => {
                 setSelectedEventId(event.id)
-                mapRef.current?.flyTo({
-                  center: [event.lng, event.lat],
-                  zoom: 13.5,
-                  essential: true,
-                })
+                flyToEvent(event.lng, event.lat)
               }}
             >
               <div className="event-title">{event.title}</div>
