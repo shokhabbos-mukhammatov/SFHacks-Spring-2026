@@ -122,6 +122,8 @@ body,
   padding: 24px;
   max-width: 340px;
   width: calc(100% - 48px);
+  max-height: 75vh;
+  overflow-y: auto;
   color: white;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
 }
@@ -148,8 +150,6 @@ body,
   font-size: 12px;
   padding: 4px 10px;
   border-radius: 999px;
-  background: rgba(139, 92, 246, 0.3);
-  color: #c4b5fd;
   margin-bottom: 12px;
 }
 

@@ -5,6 +5,29 @@ import type { EventItem } from './events'
 
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN as string | undefined
 
+const CATEGORY_COLORS: Record<string, string> = {
+  Music:                      '#f43f5e', // red-pink — concerts
+  Sports:                     '#3b82f6', // blue — sports
+  'Arts & Theatre':           '#f97316', // orange — arts
+  Film:                       '#eab308', // yellow — film
+  Free:                       '#22c55e', // green — free events
+  Meetup:                     '#22c55e', // green — meetups (usually free)
+  'Community & Culture':      '#22c55e',
+  'Science & Technology':     '#06b6d4', // cyan — tech events
+  Technology:                 '#06b6d4',
+  'Business & Professional':  '#06b6d4',
+  'Food & Drink':             '#fb923c', // orange — food
+  'Performing & Visual Arts': '#f97316',
+  'Health & Wellness':        '#4ade80',
+  'Hack Night':               '#8b5cf6', // purple — hackathons
+  Networking:                 '#a78bfa', // violet — networking
+  Mixer:                      '#a855f7',
+}
+
+function categoryColor(category: string): string {
+  return CATEGORY_COLORS[category] ?? '#94a3b8' // slate default
+}
+
 if (MAPBOX_TOKEN) {
   mapboxgl.accessToken = MAPBOX_TOKEN
 }
@@ -82,6 +105,8 @@ export default function MapView() {
         const el = document.createElement('div')
         el.className = 'event-marker'
         el.setAttribute('aria-label', event.title)
+        el.style.backgroundColor = categoryColor(event.category)
+        el.style.boxShadow = `0 0 0 6px ${categoryColor(event.category)}33`
 
         const marker = new mapboxgl.Marker(el).setLngLat([event.lng, event.lat]).addTo(map)
 
@@ -140,7 +165,7 @@ export default function MapView() {
               <div className="event-meta">
                 {event.venue} · {event.startsAt}
               </div>
-              <div className="event-tag">{event.category}</div>
+              <div className="event-tag" style={{ background: `${categoryColor(event.category)}33`, color: categoryColor(event.category) }}>{event.category}</div>
             </button>
           ))}
         </div>
@@ -150,7 +175,7 @@ export default function MapView() {
         <div className="event-popup-backdrop" onClick={() => setPopupEvent(null)}>
           <div className="event-popup" onClick={(e) => e.stopPropagation()}>
             <button className="event-popup-close" onClick={() => setPopupEvent(null)}>✕</button>
-            <div className="event-popup-tag">{popupEvent.category}</div>
+            <div className="event-popup-tag" style={{ background: `${categoryColor(popupEvent.category)}33`, color: categoryColor(popupEvent.category) }}>{popupEvent.category}</div>
             <div className="event-popup-title">{popupEvent.title}</div>
             <div className="event-popup-row">📍 {popupEvent.venue}</div>
             <div className="event-popup-row">🕐 {popupEvent.startsAt}</div>
